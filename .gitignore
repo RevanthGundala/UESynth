@@ -1,0 +1,32 @@
+# Unreal Engine
+Binaries/
+Build/
+DerivedDataCache/
+Intermediate/
+Saved/
+Script/
+.vs/
+.vscode/
+*.VC.db
+*.suo
+*.sln
+*.xcodeproj
+*.xcworkspace
+
+# Rider
+.idea/
+
+# Mac
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# Files that might appear on external disk
+.Spotlight-V100
+.Trashes 
+
+# Cursor
+.cursor/

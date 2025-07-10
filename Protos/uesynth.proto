@@ -1,0 +1,117 @@
+syntax = "proto3";
+
+package uesynth;
+
+service UESynth {
+    rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+message HealthCheckRequest {
+}
+
+message HealthCheckResponse {
+    string message = 1;
+}
+
+message Vector {
+    double x = 1;
+    double y = 2;
+    double z = 3;
+}
+
+message Rotator {
+    double pitch = 1;
+    double yaw = 2;
+    double roll = 3;
+}
+
+message Transform {
+    Vector location = 1;
+    Rotator rotation = 2;
+    Vector scale = 3;
+}
+
+service CameraService {
+    rpc GetCameraTransform(GetCameraTransformRequest) returns (GetCameraTransformResponse);
+    rpc SetCameraTransform(SetCameraTransformRequest) returns (SetCameraTransformResponse);
+    rpc GetCameraInfo(GetCameraInfoRequest) returns (GetCameraInfoResponse);
+    rpc SetFieldOfView(SetFieldOfViewRequest) returns (SetFieldOfViewResponse);
+}
+
+message GetCameraTransformRequest {
+    string camera_name = 1;
+}
+message GetCameraTransformResponse {
+    Transform transform = 1;
+}
+
+message SetCameraTransformRequest {
+    string camera_name = 1;
+    Transform transform = 2;
+}
+message SetCameraTransformResponse {
+    bool success = 1;
+}
+
+message GetCameraInfoRequest {
+    string camera_name = 1;
+}
+
+message GetCameraInfoResponse {
+    float field_of_view = 1;
+    int32 width = 2;
+    int32 height = 3;
+}
+
+message SetFieldOfViewRequest {
+    string camera_name = 1;
+    float field_of_view = 2;
+}
+message SetFieldOfViewResponse {
+    bool success = 1;
+}
+
+enum ImageType {
+    LIT = 0; // RGB
+    DEPTH = 1;
+    OBJECT_MASK = 2;
+    NORMAL = 3;
+}
+
+message ImageRequest {
+    ImageType type = 1;
+    // Potentially add more options like resolution here later
+}
+
+message ImageResponse {
+    bytes data = 1;
+    int32 width = 2;
+    int32 height = 3;
+    ImageType type = 4;
+}
+
+service CaptureService {
+    rpc Capture(ImageRequest) returns (ImageResponse);
+}
+
+service ObjectService {
+    rpc GetObjectTransform(GetObjectTransformRequest) returns (GetObjectTransformResponse);
+    rpc SetObjectTransform(SetObjectTransformRequest) returns (SetObjectTransformResponse);
+}
+
+message GetObjectTransformRequest {
+    string object_name = 1;
+}
+
+message GetObjectTransformResponse {
+    Transform transform = 1;
+}
+
+message SetObjectTransformRequest {
+    string object_name = 1;
+    Transform transform = 2;
+}
+
+message SetObjectTransformResponse {
+    bool success = 1;
+} 
