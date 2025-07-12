@@ -1,7 +1,5 @@
 # Contributing to UESynth
 
-First off, thank you for considering contributing to UESynth! It's people like you that make UESynth such a great tool.
-
 ## How to Contribute
 
 ### Reporting Bugs

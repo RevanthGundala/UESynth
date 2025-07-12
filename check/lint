@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+# Lint Python code using ruff
+# Usage: check/lint [--fix] [files...]
+
+set -e
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+# Default to checking all Python files if no arguments provided
+if [ $# -eq 0 ]; then
+    set -- .
+fi
+
+# Check if --fix flag is provided
+FIX_FLAG=""
+if [ "$1" = "--fix" ]; then
+    FIX_FLAG="--fix"
+    shift
+fi
+
+echo "Running ruff linter..."
+if [ -n "$FIX_FLAG" ]; then
+    cd client && uv run ruff check --fix "$@"
+else
+    cd client && uv run ruff check "$@"
+fi
+
+echo "Linting complete!" 

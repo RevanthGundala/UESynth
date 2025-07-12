@@ -1,0 +1,111 @@
+[project]
+name = "client"
+version = "0.1.0"
+description = "UESynth Python client library for communicating with Unreal Engine via gRPC."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "grpcio-tools>=1.73.1",
+]
+
+[MASTER]
+ignore-patterns = '''.*_pb2\.py,.*_pb2_grpc\.py'''
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+extend-exclude = ["*_pb2.py", "*_pb2_grpc.py"]
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+    "D",  # pydocstyle
+]
+ignore = [
+    "E501",  # line too long, handled by formatter
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+    "D100",  # missing docstring in public module
+    "D104",  # missing docstring in public package
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/*" = ["D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.basedpyright]
+pythonVersion = "3.12"
+include = ["uesynth", "tests"]
+exclude = ["**/*_pb2.py", "**/*_pb2_grpc.py"]
+reportMissingImports = true
+reportMissingTypeStubs = false
+reportUnusedImport = true
+reportUnusedClass = true
+reportUnusedFunction = true
+reportUnusedVariable = true
+reportDuplicateImport = true
+reportPrivateUsage = true
+reportConstantRedefinition = true
+reportIncompatibleMethodOverride = true
+reportIncompatibleVariableOverride = true
+reportOverlappingOverload = true
+reportUntypedFunctionDecorator = true
+reportUntypedClassDecorator = true
+reportUntypedBaseClass = true
+reportUntypedNamedTuple = true
+reportCallInDefaultInitializer = true
+reportUnnecessaryIsInstance = true
+reportUnnecessaryCast = true
+reportUnnecessaryComparison = true
+reportUnnecessaryContains = true
+reportAssertAlwaysTrue = true
+reportSelfClsParameterName = true
+reportImplicitStringConcatenation = false
+strict = ["uesynth"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--cov=uesynth",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "asyncio: marks tests as async tests",
+]
+asyncio_mode = "auto"
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.21.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.12.0",
+    "grpc-stubs>=1.53.0.6",
+    "types-protobuf>=6.30.2.20250703",
+    "types-setuptools>=80.9.0.20250529",
+]

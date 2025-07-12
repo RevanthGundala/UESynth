@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install tools
+        run: sudo apt-get update &amp;&amp; sudo apt-get install -y protobuf-compiler protobuf-compiler-grpc python3-pip &amp;&amp; pip install grpcio-tools &amp;&amp; curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Generate code
+        run: protoc -I Protos --cpp_out=Source/UESynth/Private/Generated --grpc_out=Source/UESynth/Private/Generated --plugin=protoc-gen-grpc=/usr/bin/grpc_cpp_plugin Protos/uesynth.proto ; mkdir -p python ; protoc -I Protos --python_out=python --grpc_python_out=python Protos/uesynth.proto
+      - name: Build UE plugin
+        # Assume build commands or use Docker
+        run: echo "Build UE plugin here"
+      - name: Build Python wheel
+        run: cd python &amp;&amp; uv pip install -r ../requirements.txt &amp;&amp; python setup.py bdist_wheel
+      - name: Package
+        run: zip -r uesynth-release.zip Binaries python/dist/*.whl # Adjust paths
+      - name: Create Release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: uesynth-release.zip
+          asset_name: uesynth-release.zip
+          asset_content_type: application/zip 

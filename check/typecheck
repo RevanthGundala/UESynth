@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+# Type check Python code using mypy
+# Usage: check/typecheck [files...]
+
+set -e
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+# Default to checking all Python files if no arguments provided
+if [ $# -eq 0 ]; then
+    set -- .
+fi
+
+echo "Running mypy type checker..."
+cd client && uv run mypy "$@"
+
+echo "Type checking complete!" 

@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+# Run all checks: format, lint, typecheck, and test
+# Usage: check/all [--fix]
+
+set -e
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+# Check if --fix flag is provided
+FIX_FLAG=""
+if [ "$1" = "--fix" ]; then
+    FIX_FLAG="--fix"
+fi
+
+echo "======================================"
+echo "Running all checks for UESynth client"
+echo "======================================"
+
+echo
+echo "1. Checking code formatting..."
+if [ -n "$FIX_FLAG" ]; then
+    ./check/format
+else
+    ./check/format --check
+fi
+
+echo
+echo "2. Running linter..."
+if [ -n "$FIX_FLAG" ]; then
+    ./check/lint --fix
+else
+    ./check/lint
+fi
+
+echo
+echo "3. Running type checker..."
+./check/typecheck
+
+echo
+echo "4. Running tests..."
+./check/test
+
+echo
+echo "======================================"
+echo "All checks passed! ✅"
+echo "======================================" 

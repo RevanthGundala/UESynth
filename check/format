@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+# Format Python code using ruff
+# Usage: check/format [--check] [files...]
+
+set -e
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+# Default to checking all Python files if no arguments provided
+if [ $# -eq 0 ]; then
+    set -- .
+fi
+
+# Check if --check flag is provided
+CHECK_FLAG=""
+if [ "$1" = "--check" ]; then
+    CHECK_FLAG="--check"
+    shift
+fi
+
+echo "Running ruff formatter..."
+if [ -n "$CHECK_FLAG" ]; then
+    cd client && uv run ruff format --check --diff "$@"
+else
+    cd client && uv run ruff format "$@"
+fi
+
+echo "Formatting complete!" 

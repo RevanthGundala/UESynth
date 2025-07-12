@@ -1,102 +1,147 @@
+// Copyright (C) 2025 UESynth Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 syntax = "proto3";
+
+import "google/protobuf/empty.proto";
 
 package uesynth;
 
-service UESynth {
-    rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse);
+// Service definition for UESynth
+service UESynthService {
+    // Bidirectional streaming method
+    rpc ControlStream(stream ActionRequest) returns (stream FrameResponse);
+    
+    // Unary methods
+
+    // Camera and Viewport Control
+    rpc SetCameraTransform(SetCameraTransformRequest) returns (CommandResponse);
+    rpc GetCameraTransform(GetCameraTransformRequest) returns (GetCameraTransformResponse);
+
+    // Data Capture
+    rpc CaptureRgbImage(CaptureRequest) returns (ImageResponse);
+    rpc CaptureDepthMap(CaptureRequest) returns (ImageResponse);
+    rpc CaptureSegmentationMask(CaptureRequest) returns (ImageResponse);
+
+    // Object Manipulation
+    rpc SetObjectTransform(SetObjectTransformRequest) returns (CommandResponse);
+    rpc GetObjectTransform(GetObjectTransformRequest) returns (GetObjectTransformResponse);
+
+    // Additional Camera Control
+    rpc CreateCamera(CreateCameraRequest) returns (CommandResponse);
+    rpc DestroyCamera(DestroyCameraRequest) returns (CommandResponse);
+    rpc SetResolution(SetResolutionRequest) returns (CommandResponse);
+
+    // Additional Data Capture
+    rpc CaptureNormals(CaptureRequest) returns (ImageResponse);
+    rpc CaptureOpticalFlow(CaptureRequest) returns (ImageResponse);
+
+    // Additional Object Manipulation
+    rpc SpawnObject(SpawnObjectRequest) returns (CommandResponse);
+    rpc DestroyObject(DestroyObjectRequest) returns (CommandResponse);
+    rpc SetMaterial(SetMaterialRequest) returns (CommandResponse);
+
+    // Scene Control
+    rpc ListObjects(google.protobuf.Empty) returns (ListObjectsResponse);
+    rpc SetLighting(SetLightingRequest) returns (CommandResponse);
 }
 
-message HealthCheckRequest {
+// Streaming methods
+
+// Request message that can represent any possible client action
+message ActionRequest {
+    string request_id = 1; // Unique identifier for request tracking
+    oneof action {
+        SetCameraTransformRequest set_camera_transform = 2;
+        GetCameraTransformRequest get_camera_transform = 3;
+        CaptureRequest capture_rgb = 4;
+        CaptureRequest capture_depth = 5;
+        CaptureRequest capture_segmentation = 6;
+        CaptureRequest capture_normals = 7;
+        CaptureRequest capture_optical_flow = 8;
+        SetObjectTransformRequest set_object_transform = 9;
+        GetObjectTransformRequest get_object_transform = 10;
+        CreateCameraRequest create_camera = 11;
+        DestroyCameraRequest destroy_camera = 12;
+        SetResolutionRequest set_resolution = 13;
+        SpawnObjectRequest spawn_object = 14;
+        DestroyObjectRequest destroy_object = 15;
+        SetMaterialRequest set_material = 16;
+        google.protobuf.Empty list_objects = 17;
+        SetLightingRequest set_lighting = 18;
+    }
 }
 
-message HealthCheckResponse {
-    string message = 1;
+// Response message for streaming communication
+message FrameResponse {
+    string request_id = 1; // To correlate response with a specific request
+    oneof response {
+        CommandResponse command_response = 2;
+        GetCameraTransformResponse camera_transform = 3;
+        ImageResponse image_response = 4;
+        GetObjectTransformResponse object_transform = 5;
+        ListObjectsResponse objects_list = 6;
+    }
 }
 
-message Vector {
-    double x = 1;
-    double y = 2;
-    double z = 3;
+// Common Messages
+message Vector3 {
+    float x = 1;
+    float y = 2;
+    float z = 3;
 }
 
 message Rotator {
-    double pitch = 1;
-    double yaw = 2;
-    double roll = 3;
+    float pitch = 1;
+    float yaw = 2;
+    float roll = 3;
 }
 
 message Transform {
-    Vector location = 1;
+    Vector3 location = 1;
     Rotator rotation = 2;
-    Vector scale = 3;
+    Vector3 scale = 3;
 }
 
-service CameraService {
-    rpc GetCameraTransform(GetCameraTransformRequest) returns (GetCameraTransformResponse);
-    rpc SetCameraTransform(SetCameraTransformRequest) returns (SetCameraTransformResponse);
-    rpc GetCameraInfo(GetCameraInfoRequest) returns (GetCameraInfoResponse);
-    rpc SetFieldOfView(SetFieldOfViewRequest) returns (SetFieldOfViewResponse);
+message CommandResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+// Camera Messages
+message SetCameraTransformRequest {
+    string camera_name = 1; // Optional: if empty, use default camera
+    Transform transform = 2;
 }
 
 message GetCameraTransformRequest {
-    string camera_name = 1;
+    string camera_name = 1; // Optional: if empty, use default camera
 }
+
 message GetCameraTransformResponse {
     Transform transform = 1;
+    bool success = 2;
+    string message = 3;
 }
 
-message SetCameraTransformRequest {
-    string camera_name = 1;
-    Transform transform = 2;
-}
-message SetCameraTransformResponse {
-    bool success = 1;
-}
-
-message GetCameraInfoRequest {
-    string camera_name = 1;
-}
-
-message GetCameraInfoResponse {
-    float field_of_view = 1;
-    int32 width = 2;
-    int32 height = 3;
-}
-
-message SetFieldOfViewRequest {
-    string camera_name = 1;
-    float field_of_view = 2;
-}
-message SetFieldOfViewResponse {
-    bool success = 1;
-}
-
-enum ImageType {
-    LIT = 0; // RGB
-    DEPTH = 1;
-    OBJECT_MASK = 2;
-    NORMAL = 3;
-}
-
-message ImageRequest {
-    ImageType type = 1;
-    // Potentially add more options like resolution here later
+// Data Capture Messages
+message CaptureRequest {
+    string camera_name = 1; // Optional
+    uint32 width = 2;
+    uint32 height = 3;
 }
 
 message ImageResponse {
-    bytes data = 1;
-    int32 width = 2;
-    int32 height = 3;
-    ImageType type = 4;
+    bytes image_data = 1;
+    uint32 width = 2;
+    uint32 height = 3;
+    string format = 4; // e.g., "png", "exr"
 }
 
-service CaptureService {
-    rpc Capture(ImageRequest) returns (ImageResponse);
-}
-
-service ObjectService {
-    rpc GetObjectTransform(GetObjectTransformRequest) returns (GetObjectTransformResponse);
-    rpc SetObjectTransform(SetObjectTransformRequest) returns (SetObjectTransformResponse);
+// Object Manipulation Messages
+message SetObjectTransformRequest {
+    string object_name = 1;
+    Transform transform = 2;
 }
 
 message GetObjectTransformRequest {
@@ -105,13 +150,49 @@ message GetObjectTransformRequest {
 
 message GetObjectTransformResponse {
     Transform transform = 1;
+    bool success = 2;
+    string message = 3;
 }
 
-message SetObjectTransformRequest {
+// Additional Messages
+message CreateCameraRequest {
+    string camera_name = 1;
+    Transform initial_transform = 2;
+}
+
+message DestroyCameraRequest {
+    string camera_name = 1;
+}
+
+message SetResolutionRequest {
+    string camera_name = 1;
+    uint32 width = 2;
+    uint32 height = 3;
+}
+
+message ListObjectsResponse {
+    repeated string object_names = 1;
+}
+
+message SpawnObjectRequest {
     string object_name = 1;
-    Transform transform = 2;
+    string asset_path = 2;
+    Transform initial_transform = 3;
 }
 
-message SetObjectTransformResponse {
-    bool success = 1;
+message DestroyObjectRequest {
+    string object_name = 1;
+}
+
+message SetMaterialRequest {
+    string object_name = 1;
+    string material_property = 2;
+    string value = 3; // Simplified
+}
+
+message SetLightingRequest {
+    string light_name = 1;
+    float intensity = 2;
+    Vector3 color = 3;
+    Transform transform = 4;
 } 

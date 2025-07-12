@@ -1,23 +1,45 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
+// Copyright (C) 2025 UESynth Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+/* This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 using UnrealBuildTool;
+using System.IO;
 
 public class UESynth : ModuleRules
 {
 	public UESynth(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
-		
-		PublicIncludePaths.AddRange(
-			new string[] {
-				// ... add public include paths required here ...
+
+		bEnableExceptions = true;
+
+		PublicDependencyModuleNames.AddRange(
+			new string[]
+			{
+				"Core",
+				"Projects",
+				"TurboLinkGrpc"
 			}
-			);
+		);
 				
 		
 		PrivateIncludePaths.AddRange(
 			new string[] {
 				// ... add other private include paths required here ...
+				"UESynth/Private/Generated"
 			}
 			);
 			
@@ -26,7 +48,10 @@ public class UESynth : ModuleRules
 			new string[]
 			{
 				"Core",
-				// ... add other public dependencies that you statically link with here ...
+				"Projects",
+				"TurboLinkGrpc",
+				"CoreUObject",
+				"Engine"
 			}
 			);
 			
@@ -38,21 +63,7 @@ public class UESynth : ModuleRules
 				"Engine",
 				"Slate",
 				"SlateCore",
-				"InputCore",
-				"LevelEditor",
-				"EditorStyle",
-				"ToolMenus",
-				"UnrealEd",
-				"PropertyEditor"
-				// ... add private dependencies that you statically link with here ...	
-			}
-			);
-		
-		
-		DynamicallyLoadedModuleNames.AddRange(
-			new string[]
-			{
-				// ... add any modules that your module loads dynamically here ...
+				"TurboLinkGrpc",
 			}
 			);
 	}
