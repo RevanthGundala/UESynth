@@ -155,33 +155,48 @@ grpc::Status UESynthServiceImpl::ProcessAction(const uesynth::ActionRequest& req
 grpc::Status UESynthServiceImpl::SetCameraTransform(grpc::ServerContext* context, const uesynth::SetCameraTransformRequest* request, uesynth::CommandResponse* reply) {
     bool success = false;
     std::string message;
-    auto future = Async(EAsyncExecution::TaskGraphMainThread, [=]() -> bool {
+    auto future = Async(EAsyncExecution::TaskGraphMainThread, [request, &success, &message]() -> bool {
         UWorld* World = GEngine->GetWorldFromContextObject(nullptr, EGetWorldErrorMode::LogAndReturnNull);
         if (World) {
             AActor* Camera = UGameplayStatics::GetActorOfClass(World, ACameraActor::StaticClass()); // Placeholder
             if (Camera) {
-                // Set transform
+                // Convert protobuf types to Unreal Engine types
+                FVector Location(
+                    request->transform().location().x(),
+                    request->transform().location().y(),
+                    request->transform().location().z()
+                );
+                FRotator Rotation(
+                    request->transform().rotation().pitch(),
+                    request->transform().rotation().yaw(),
+                    request->transform().rotation().roll()
+                );
+                
+                Camera->SetActorLocationAndRotation(Location, Rotation);
+                message = "Camera transform set successfully";
+                success = true;
                 return true;
             }
         }
+        message = "Camera not found";
+        success = false;
         return false;
     });
-    success = future.Get();
+    future.Get();
     reply->set_success(success);
     reply->set_message(message);
     return grpc::Status::OK;
 }
 
-// Implement other methods similarly with placeholders
-// e.g., CaptureRgbImage would use UE's screenshot or high-res screenshot request 
-
 grpc::Status UESynthServiceImpl::CaptureRgbImage(grpc::ServerContext* context, const uesynth::CaptureRequest* request, uesynth::ImageResponse* reply) {
     std::promise<std::vector<uint8>> promise;
     auto future = promise.get_future();
-    AsyncTask(ENamedThreads::GameThread, [&]() {
+    AsyncTask(ENamedThreads::GameThread, [&promise, request]() {
         // Placeholder: Use FHighResScreenshotConfig for capture
         // Simulate image data
-        std::vector<uint8> imageData( request->width() * request->height() * 4, 255 );
+        std::vector<uint8> imageData(request->width() * request->height() * 4, 255);
+        // Note: FHighResScreenshot::CaptureScreen would need proper implementation
+        // For now, just return dummy data
         promise.set_value(imageData);
     });
     auto data = future.get();
@@ -192,14 +207,35 @@ grpc::Status UESynthServiceImpl::CaptureRgbImage(grpc::ServerContext* context, c
     return grpc::Status::OK;
 }
 
-grpc::Status UESynthServiceImpl::GetCameraTransform(grpc::ServerContext* context, const uesynth::GetCameraTransformRequest* request, uesynth::GetCameraTransformResponse* reply) {
-    // Placeholder implementation
-    reply->mutable_transform()->mutable_location()->set_x(0.0f);
-    reply->mutable_transform()->mutable_location()->set_y(0.0f);
-    reply->mutable_transform()->mutable_location()->set_z(0.0f);
-    reply->mutable_transform()->mutable_rotation()->set_pitch(0.0f);
-    reply->mutable_transform()->mutable_rotation()->set_yaw(0.0f);
-    reply->mutable_transform()->mutable_rotation()->set_roll(0.0f);
+grpc::Status UESynthServiceImpl::GetCameraTransform(
+    grpc::ServerContext* context,
+    const uesynth::GetCameraTransformRequest* request,
+    uesynth::GetCameraTransformResponse* reply
+) {
+    // Placeholder implementation - get camera transform
+    auto future = Async(EAsyncExecution::TaskGraphMainThread, [request]() -> FTransform {
+        UWorld* World = GEngine->GetWorldFromContextObject(nullptr, EGetWorldErrorMode::LogAndReturnNull);
+        if (World) {
+            AActor* Camera = UGameplayStatics::GetActorOfClass(World, ACameraActor::StaticClass());
+            if (Camera) {
+                return Camera->GetActorTransform();
+            }
+        }
+        return FTransform::Identity;
+    });
+    
+    FTransform CameraTransform = future.Get();
+    
+    // Populate the reply with the transform data
+    reply->mutable_transform()->mutable_location()->set_x(CameraTransform.GetLocation().X);
+    reply->mutable_transform()->mutable_location()->set_y(CameraTransform.GetLocation().Y);
+    reply->mutable_transform()->mutable_location()->set_z(CameraTransform.GetLocation().Z);
+
+    FRotator Rotation = CameraTransform.GetRotation().Rotator();
+    reply->mutable_transform()->mutable_rotation()->set_pitch(Rotation.Pitch);
+    reply->mutable_transform()->mutable_rotation()->set_yaw(Rotation.Yaw);
+    reply->mutable_transform()->mutable_rotation()->set_roll(Rotation.Roll);
+
     return grpc::Status::OK;
 }
 
