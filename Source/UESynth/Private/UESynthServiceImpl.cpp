@@ -19,10 +19,13 @@
 #include "UESynth.h" // For module access
 #include "Kismet/GameplayStatics.h"
 #include "Camera/CameraComponent.h"
+#include "Camera/CameraActor.h"
 #include "Components/PrimitiveComponent.h"
 #include "Async/Async.h"
 #include "GameFramework/Actor.h"
 #include "Async/TaskGraphInterfaces.h"
+#include "Engine/World.h"
+#include "Engine/Engine.h"
 #include <grpcpp/server_builder.h>
 #include <future>
 
@@ -153,14 +156,17 @@ grpc::Status UESynthServiceImpl::SetCameraTransform(grpc::ServerContext* context
     bool success = false;
     std::string message;
     auto future = Async(EAsyncExecution::TaskGraphMainThread, [=]() -> bool {
-        AActor* Camera = UGameplayStatics::GetActorOfClass(GWorld, ACameraActor::StaticClass()); // Placeholder
-        if (Camera) {
-            // Set transform
-            return true;
+        UWorld* World = GEngine->GetWorldFromContextObject(nullptr, EGetWorldErrorMode::LogAndReturnNull);
+        if (World) {
+            AActor* Camera = UGameplayStatics::GetActorOfClass(World, ACameraActor::StaticClass()); // Placeholder
+            if (Camera) {
+                // Set transform
+                return true;
+            }
         }
         return false;
     });
-    success = future.get();
+    success = future.Get();
     reply->set_success(success);
     reply->set_message(message);
     return grpc::Status::OK;
@@ -183,5 +189,130 @@ grpc::Status UESynthServiceImpl::CaptureRgbImage(grpc::ServerContext* context, c
     reply->set_width(request->width());
     reply->set_height(request->height());
     reply->set_format("png");
+    return grpc::Status::OK;
+}
+
+grpc::Status UESynthServiceImpl::GetCameraTransform(grpc::ServerContext* context, const uesynth::GetCameraTransformRequest* request, uesynth::GetCameraTransformResponse* reply) {
+    // Placeholder implementation
+    reply->mutable_transform()->mutable_location()->set_x(0.0f);
+    reply->mutable_transform()->mutable_location()->set_y(0.0f);
+    reply->mutable_transform()->mutable_location()->set_z(0.0f);
+    reply->mutable_transform()->mutable_rotation()->set_pitch(0.0f);
+    reply->mutable_transform()->mutable_rotation()->set_yaw(0.0f);
+    reply->mutable_transform()->mutable_rotation()->set_roll(0.0f);
+    return grpc::Status::OK;
+}
+
+grpc::Status UESynthServiceImpl::CaptureDepthMap(grpc::ServerContext* context, const uesynth::CaptureRequest* request, uesynth::ImageResponse* reply) {
+    // Placeholder implementation
+    reply->set_width(request->width());
+    reply->set_height(request->height());
+    reply->set_format("png");
+    std::string dummyData(request->width() * request->height(), '\0');
+    reply->set_image_data(dummyData);
+    return grpc::Status::OK;
+}
+
+grpc::Status UESynthServiceImpl::CaptureSegmentationMask(grpc::ServerContext* context, const uesynth::CaptureRequest* request, uesynth::ImageResponse* reply) {
+    // Placeholder implementation
+    reply->set_width(request->width());
+    reply->set_height(request->height());
+    reply->set_format("png");
+    std::string dummyData(request->width() * request->height() * 3, '\0');
+    reply->set_image_data(dummyData);
+    return grpc::Status::OK;
+}
+
+grpc::Status UESynthServiceImpl::SetObjectTransform(grpc::ServerContext* context, const uesynth::SetObjectTransformRequest* request, uesynth::CommandResponse* reply) {
+    // Placeholder implementation
+    reply->set_success(true);
+    reply->set_message("SetObjectTransform not yet implemented");
+    return grpc::Status::OK;
+}
+
+grpc::Status UESynthServiceImpl::GetObjectTransform(grpc::ServerContext* context, const uesynth::GetObjectTransformRequest* request, uesynth::GetObjectTransformResponse* reply) {
+    // Placeholder implementation
+    reply->mutable_transform()->mutable_location()->set_x(0.0f);
+    reply->mutable_transform()->mutable_location()->set_y(0.0f);
+    reply->mutable_transform()->mutable_location()->set_z(0.0f);
+    reply->mutable_transform()->mutable_rotation()->set_pitch(0.0f);
+    reply->mutable_transform()->mutable_rotation()->set_yaw(0.0f);
+    reply->mutable_transform()->mutable_rotation()->set_roll(0.0f);
+    return grpc::Status::OK;
+}
+
+grpc::Status UESynthServiceImpl::CreateCamera(grpc::ServerContext* context, const uesynth::CreateCameraRequest* request, uesynth::CommandResponse* reply) {
+    // Placeholder implementation
+    reply->set_success(true);
+    reply->set_message("CreateCamera not yet implemented");
+    return grpc::Status::OK;
+}
+
+grpc::Status UESynthServiceImpl::DestroyCamera(grpc::ServerContext* context, const uesynth::DestroyCameraRequest* request, uesynth::CommandResponse* reply) {
+    // Placeholder implementation
+    reply->set_success(true);
+    reply->set_message("DestroyCamera not yet implemented");
+    return grpc::Status::OK;
+}
+
+grpc::Status UESynthServiceImpl::SetResolution(grpc::ServerContext* context, const uesynth::SetResolutionRequest* request, uesynth::CommandResponse* reply) {
+    // Placeholder implementation
+    reply->set_success(true);
+    reply->set_message("SetResolution not yet implemented");
+    return grpc::Status::OK;
+}
+
+grpc::Status UESynthServiceImpl::CaptureNormals(grpc::ServerContext* context, const uesynth::CaptureRequest* request, uesynth::ImageResponse* reply) {
+    // Placeholder implementation
+    reply->set_width(request->width());
+    reply->set_height(request->height());
+    reply->set_format("png");
+    std::string dummyData(request->width() * request->height() * 3, '\0');
+    reply->set_image_data(dummyData);
+    return grpc::Status::OK;
+}
+
+grpc::Status UESynthServiceImpl::CaptureOpticalFlow(grpc::ServerContext* context, const uesynth::CaptureRequest* request, uesynth::ImageResponse* reply) {
+    // Placeholder implementation
+    reply->set_width(request->width());
+    reply->set_height(request->height());
+    reply->set_format("png");
+    std::string dummyData(request->width() * request->height() * 2, '\0');
+    reply->set_image_data(dummyData);
+    return grpc::Status::OK;
+}
+
+grpc::Status UESynthServiceImpl::SpawnObject(grpc::ServerContext* context, const uesynth::SpawnObjectRequest* request, uesynth::CommandResponse* reply) {
+    // Placeholder implementation
+    reply->set_success(true);
+    reply->set_message("SpawnObject not yet implemented");
+    return grpc::Status::OK;
+}
+
+grpc::Status UESynthServiceImpl::DestroyObject(grpc::ServerContext* context, const uesynth::DestroyObjectRequest* request, uesynth::CommandResponse* reply) {
+    // Placeholder implementation
+    reply->set_success(true);
+    reply->set_message("DestroyObject not yet implemented");
+    return grpc::Status::OK;
+}
+
+grpc::Status UESynthServiceImpl::SetMaterial(grpc::ServerContext* context, const uesynth::SetMaterialRequest* request, uesynth::CommandResponse* reply) {
+    // Placeholder implementation
+    reply->set_success(true);
+    reply->set_message("SetMaterial not yet implemented");
+    return grpc::Status::OK;
+}
+
+grpc::Status UESynthServiceImpl::ListObjects(grpc::ServerContext* context, const google::protobuf::Empty* request, uesynth::ListObjectsResponse* reply) {
+    // Placeholder implementation - add some dummy objects
+    reply->add_object_names("DummyObject1");
+    reply->add_object_names("DummyObject2");
+    return grpc::Status::OK;
+}
+
+grpc::Status UESynthServiceImpl::SetLighting(grpc::ServerContext* context, const uesynth::SetLightingRequest* request, uesynth::CommandResponse* reply) {
+    // Placeholder implementation
+    reply->set_success(true);
+    reply->set_message("SetLighting not yet implemented");
     return grpc::Status::OK;
 } 

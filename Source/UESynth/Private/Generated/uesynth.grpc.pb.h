@@ -19,13 +19,13 @@
 #include <grpcpp/completion_queue.h>
 #include <grpcpp/support/message_allocator.h>
 #include <grpcpp/support/method_handler.h>
-#include <grpcpp/impl/codegen/proto_utils.h>
+#include <grpcpp/impl/proto_utils.h>
 #include <grpcpp/impl/rpc_method.h>
 #include <grpcpp/support/server_callback.h>
-#include <grpcpp/impl/codegen/server_callback_handlers.h>
+#include <grpcpp/impl/server_callback_handlers.h>
 #include <grpcpp/server_context.h>
 #include <grpcpp/impl/service_type.h>
-#include <grpcpp/impl/codegen/status.h>
+#include <grpcpp/support/status.h>
 #include <grpcpp/support/stub_options.h>
 #include <grpcpp/support/sync_stream.h>
 
@@ -40,7 +40,7 @@ class UESynthService final {
   class StubInterface {
    public:
     virtual ~StubInterface() {}
-    // New bidirectional streaming method
+    // Bidirectional streaming method
     std::unique_ptr< ::grpc::ClientReaderWriterInterface< ::uesynth::ActionRequest, ::uesynth::FrameResponse>> ControlStream(::grpc::ClientContext* context) {
       return std::unique_ptr< ::grpc::ClientReaderWriterInterface< ::uesynth::ActionRequest, ::uesynth::FrameResponse>>(ControlStreamRaw(context));
     }
@@ -50,6 +50,8 @@ class UESynthService final {
     std::unique_ptr< ::grpc::ClientAsyncReaderWriterInterface< ::uesynth::ActionRequest, ::uesynth::FrameResponse>> PrepareAsyncControlStream(::grpc::ClientContext* context, ::grpc::CompletionQueue* cq) {
       return std::unique_ptr< ::grpc::ClientAsyncReaderWriterInterface< ::uesynth::ActionRequest, ::uesynth::FrameResponse>>(PrepareAsyncControlStreamRaw(context, cq));
     }
+    // Unary methods
+    //
     // Camera and Viewport Control
     virtual ::grpc::Status SetCameraTransform(::grpc::ClientContext* context, const ::uesynth::SetCameraTransformRequest& request, ::uesynth::CommandResponse* response) = 0;
     std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::uesynth::CommandResponse>> AsyncSetCameraTransform(::grpc::ClientContext* context, const ::uesynth::SetCameraTransformRequest& request, ::grpc::CompletionQueue* cq) {
@@ -179,8 +181,10 @@ class UESynthService final {
     class async_interface {
      public:
       virtual ~async_interface() {}
-      // New bidirectional streaming method
+      // Bidirectional streaming method
       virtual void ControlStream(::grpc::ClientContext* context, ::grpc::ClientBidiReactor< ::uesynth::ActionRequest,::uesynth::FrameResponse>* reactor) = 0;
+      // Unary methods
+      //
       // Camera and Viewport Control
       virtual void SetCameraTransform(::grpc::ClientContext* context, const ::uesynth::SetCameraTransformRequest* request, ::uesynth::CommandResponse* response, std::function<void(::grpc::Status)>) = 0;
       virtual void SetCameraTransform(::grpc::ClientContext* context, const ::uesynth::SetCameraTransformRequest* request, ::uesynth::CommandResponse* response, ::grpc::ClientUnaryReactor* reactor) = 0;
@@ -507,8 +511,10 @@ class UESynthService final {
    public:
     Service();
     virtual ~Service();
-    // New bidirectional streaming method
+    // Bidirectional streaming method
     virtual ::grpc::Status ControlStream(::grpc::ServerContext* context, ::grpc::ServerReaderWriter< ::uesynth::FrameResponse, ::uesynth::ActionRequest>* stream);
+    // Unary methods
+    //
     // Camera and Viewport Control
     virtual ::grpc::Status SetCameraTransform(::grpc::ServerContext* context, const ::uesynth::SetCameraTransformRequest* request, ::uesynth::CommandResponse* response);
     virtual ::grpc::Status GetCameraTransform(::grpc::ServerContext* context, const ::uesynth::GetCameraTransformRequest* request, ::uesynth::GetCameraTransformResponse* response);
