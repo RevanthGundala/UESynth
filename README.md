@@ -1,142 +1,66 @@
-# UESynth: A Synthetic Data Generation Plugin for Unreal Engine
+# UESynth Documentation
 
-[![Build Status](https://github.com/your-username/uesynth/actions/workflows/ci.yml/badge.svg)](https://github.com/your-username/uesynth/actions)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Documentation](https://img.shields.io/badge/docs-gitbook-blue.svg)](https://your-username.gitbook.io/uesynth/)
-[![Python Package](https://img.shields.io/pypi/v/uesynth.svg)](https://pypi.org/project/uesynth/)
+Welcome to the UESynth documentation! UESynth is a powerful and user-friendly Unreal Engine plugin for synthetic data generation, inspired by UnrealCV.
 
 ## Overview
-UESynth is a powerful and user-friendly Unreal Engine plugin for synthetic data generation, inspired by UnrealCV. It provides a comprehensive API for controlling scenes, manipulating objects, and capturing a wide variety of data modalities for use in computer vision and machine learning research.
 
-## Key Features
--   **Multi-modal Data Capture:** Capture RGB, depth, segmentation masks, surface normals, and more
--   **High-Performance API:** Both synchronous and asynchronous Python clients with streaming support  
--   **Scene and Object Manipulation:** Programmatically control objects, lighting, and materials
--   **gRPC-based Communication:** Modern, robust, and high-performance networking
--   **Real-time Capabilities:** Support for 100-1000+ requests/second with async streaming
--   **Scene Randomization:** Tools for domain randomization to create diverse datasets
--   **Editor Integration:** User-friendly interface within the Unreal Editor
+UESynth provides a comprehensive API for controlling scenes, manipulating objects, and capturing a wide variety of data modalities for use in computer vision and machine learning research.
 
-## Quick Start
+### Key Features
 
-### Installation
+- **Multi-modal Data Capture:** Capture RGB, depth, segmentation masks, surface normals, and more
+- **Scene and Object Manipulation:** Programmatically control objects, lighting, and materials
+- **gRPC-based API:** A modern, robust, and easy-to-use API for external clients (Python)
+- **Bidirectional Streaming:** High-performance streaming for real-time simulation and data capture
+- **Scene Randomization:** Tools for domain randomization to create diverse datasets
+- **Editor Integration:** User-friendly interface within the Unreal Editor
 
-1. **Install the Python client:**
-   ```bash
-   uv pip install uesynth
-   ```
+## Documentation Structure
 
-2. **Install the UE plugin:**
-   - Download from [GitHub Releases](https://github.com/your-username/uesynth/releases)
-   - Extract to your project's `Plugins/` directory
-   - Enable in the UE Editor
+This documentation is organized into the following sections:
 
-3. **First capture:**
-   ```python
-   from uesynth import UESynthClient
-   import cv2
-   
-   with UESynthClient() as client:
-       client.camera.set_location(x=0, y=100, z=50)
-       image = client.capture.rgb()
-       cv2.imwrite("my_first_capture.png", image)
-   ```
+### 🚀 [Getting Started](getting-started/)
+- [Installation](getting-started/installation.md)
+- [Quick Start](getting-started/quick-start.md)
+- [Configuration](getting-started/configuration.md)
 
-📖 **[Complete Installation Guide](docs/getting-started/installation.md)**
+### 📖 [User Guides](guides/)
+- [Basic Usage](guides/basic-usage.md)
+- [Advanced Features](guides/advanced-features.md)
+- [Scene Randomization](guides/scene-randomization.md)
+- [Data Collection Workflows](guides/data-collection.md)
 
-## Performance Comparison
+### 📚 [API Reference](api-reference/)
+- [Synchronous Client](api-reference/sync-client.md)
+- [Asynchronous Client](api-reference/async-client.md)
+- [Camera Controls](api-reference/camera.md)
+- [Object Manipulation](api-reference/objects.md)
+- [Data Capture](api-reference/capture.md)
 
-UESynth provides both synchronous and asynchronous clients for different use cases:
+### 💡 [Examples](examples/)
+- [Basic Examples](examples/basic-examples.md)
+- [Async Streaming](examples/async-streaming.md)
+- [Batch Processing](examples/batch-processing.md)
+- [Real-time Simulation](examples/real-time.md)
 
-| Client Type | Performance | Best For |
-|-------------|-------------|----------|
-| **Sync Client** | 10-50 req/sec | Simple scripts, prototyping |
-| **Async Client** | 100-1000+ req/sec | Real-time sims, batch processing |
+### ⚡ [Performance](performance/)
+- [Optimization Guide](performance/optimization.md)
+- [Benchmarks](performance/benchmarks.md)
+- [Best Practices](performance/best-practices.md)
 
-### Synchronous Client
-```python
-from uesynth import UESynthClient
-import cv2
+### 🤝 [Contributing](contributing.md)
+Guidelines for contributing to the UESynth project.
 
-with UESynthClient() as client:
-    client.camera.set_location(x=0, y=100, z=50)
-    image = client.capture.rgb()
-    cv2.imwrite("captured.png", image)
-```
+## Quick Links
 
-### Asynchronous Client
-For high-performance scenarios requiring thousands of operations:
+- [GitHub Repository](https://github.com/your-username/uesynth)
+- [Installation Guide](getting-started/installation.md)
+- [Quick Start Tutorial](getting-started/quick-start.md)
+- [API Reference](api-reference/)
 
-```python
-import asyncio
-from uesynth import AsyncUESynthClient
+## Support
 
-async def high_performance_capture():
-    async with AsyncUESynthClient() as client:
-        # High-frequency simulation loop
-        for timestep in range(1000):
-            # Non-blocking operations
-            await client.camera.set_location(x=timestep * 10, y=100, z=50)
-            await client.capture.rgb()
-            
-            # Get latest frame when ready
-            frame = await client.get_latest_frame()
-            if frame is not None:
-                cv2.imwrite(f"frame_{timestep:06d}.png", frame)
-            
-            await asyncio.sleep(0.01)  # 100 FPS target
-
-asyncio.run(high_performance_capture())
-```
-
-## Data Modalities
-
-UESynth supports multiple data types for comprehensive scene understanding:
-
-- **RGB Images** - Standard color imagery
-- **Depth Maps** - Distance information  
-- **Segmentation Masks** - Object instance IDs
-- **Surface Normals** - Object surface orientations
-- **Multi-modal Capture** - All data types simultaneously
-
-```python
-# Capture all data types at once
-data = client.capture.all_modalities(width=1024, height=768)
-rgb = data['rgb']
-depth = data['depth'] 
-segmentation = data['segmentation']
-normals = data['normals']
-```
-
-## Documentation
-
-📚 **[Complete Documentation](docs/)** - Comprehensive guides and API reference
-
-### Quick Links
-- **[Installation Guide](docs/getting-started/installation.md)** - Detailed setup instructions
-- **[Quick Start Tutorial](docs/getting-started/quick-start.md)** - Get up and running in minutes  
-- **[API Reference](docs/api-reference/)** - Complete API documentation
-- **[Performance Guide](docs/performance/optimization.md)** - Maximize throughput and efficiency
-- **[Examples](docs/examples/)** - Practical code examples and patterns
-- **[Contributing Guide](docs/contributing.md)** - How to contribute to the project
-
-### Key Documentation Sections
-
-| Section | Description |
-|---------|-------------|
-| **[Getting Started](docs/getting-started/)** | Installation, quick start, configuration |
-| **[User Guides](docs/guides/)** | Basic usage, advanced features, workflows |
-| **[API Reference](docs/api-reference/)** | Complete client API documentation |
-| **[Examples](docs/examples/)** | Practical code examples and patterns |
-| **[Performance](docs/performance/)** | Optimization guides and benchmarks |
-
-## Community & Support
-
-- **📖 Documentation:** [docs/](docs/)
-- **🐛 Bug Reports:** [GitHub Issues](https://github.com/your-username/uesynth/issues)
-- **💡 Feature Requests:** [GitHub Issues](https://github.com/your-username/uesynth/issues)
-- **🤝 Contributing:** [Contributing Guide](docs/contributing.md)
-
-## License
-
-This project is licensed under the GNU General Public License v3.0. See the [LICENSE](LICENSE) file for details. 
+If you encounter any issues or have questions, please:
+- Check the [documentation](getting-started/)
+- Search [existing issues](https://github.com/your-username/uesynth/issues)
+- Create a [new issue](https://github.com/your-username/uesynth/issues/new) 
