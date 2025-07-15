@@ -2,8 +2,8 @@
 // If you make any local change, they will be lost.
 // source: uesynth.proto
 // Original file comments:
-// Copyright (C) 2025 UESynth Project
-// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2025 UESynth Project
+// SPDX-License-Identifier: MIT
 //
 #ifndef GRPC_uesynth_2eproto__INCLUDED
 #define GRPC_uesynth_2eproto__INCLUDED
