@@ -28,5 +28,6 @@ Script/
 .Spotlight-V100
 .Trashes 
 
-# Cursor
+# Local
 .cursor/
+scripts/
