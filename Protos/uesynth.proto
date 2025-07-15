@@ -1,5 +1,5 @@
-// Copyright (C) 2025 UESynth Project
-// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2025 UESynth Project
+// SPDX-License-Identifier: MIT
 
 syntax = "proto3";
 
