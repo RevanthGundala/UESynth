@@ -1,0 +1,378 @@
+#!/usr/bin/env pwsh
+
+# Copyright (c) 2025 UESynth Project
+# SPDX-License-Identifier: MIT
+
+<#
+.SYNOPSIS
+    Local integration testing script for UESynth plugin.
+
+.DESCRIPTION
+    This script provides comprehensive integration testing that validates
+    Python-C++ communication and end-to-end test scenario execution.
+
+.PARAMETER PythonOnly
+    Run only Python integration tests
+
+.PARAMETER CppOnly
+    Run only C++ integration tests
+
+.PARAMETER HealthCheck
+    Run server health check before integration tests
+
+.PARAMETER Verbose
+    Enable verbose output for debugging
+
+.PARAMETER ServerAddress
+    gRPC server address for testing. Default: 172.27.224.1:50051
+
+.PARAMETER Timeout
+    Test timeout in minutes. Default: 10
+
+.EXAMPLE
+    .\check\integration
+    Run all integration tests
+
+.EXAMPLE
+    .\check\integration -HealthCheck -Verbose
+    Run with health check and verbose output
+
+.EXAMPLE
+    .\check\integration -PythonOnly -ServerAddress "localhost:50051"
+    Run only Python tests with custom server address
+#>
+
+param(
+    [switch]$PythonOnly,
+    [switch]$CppOnly,
+    [switch]$HealthCheck,
+    [switch]$Verbose,
+    [string]$ServerAddress = "172.27.224.1:50051",
+    [int]$Timeout = 10
+)
+
+# Get script directory and project root
+$scriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
+$projectRoot = Split-Path $scriptDir -Parent
+
+Write-Host "UESynth Integration Testing" -ForegroundColor Cyan
+Write-Host "===========================" -ForegroundColor Cyan
+Write-Host "Server Address: $ServerAddress" -ForegroundColor Yellow
+Write-Host "Timeout: $Timeout minutes" -ForegroundColor Yellow
+Write-Host ""
+
+# Function to check prerequisites
+function Test-Prerequisites {
+    Write-Host "Checking prerequisites..." -ForegroundColor Cyan
+    
+    $issues = @()
+    
+    # Check Python client
+    $clientDir = Join-Path $projectRoot "client"
+    if (-not (Test-Path $clientDir)) {
+        $issues += "Python client directory not found: $clientDir"
+    } else {
+        $pythonClient = Join-Path $clientDir "uesynth"
+        if (-not (Test-Path $pythonClient)) {
+            $issues += "Python client package not found: $pythonClient"
+        }
+    }
+    
+    # Check C++ integration tests
+    $cppIntegrationTest = Join-Path $projectRoot "Source\UESynth\Tests\Integration\GrpcServiceTest.cpp"
+    if (-not (Test-Path $cppIntegrationTest)) {
+        $issues += "C++ integration test not found: $cppIntegrationTest"
+    }
+    
+    # Check test validation scripts
+    $cppValidationScript = Join-Path $projectRoot "Source\UESynth\Tests\ValidateIntegrationTests.ps1"
+    if (-not (Test-Path $cppValidationScript)) {
+        $issues += "C++ integration validation script not found: $cppValidationScript"
+    }
+    
+    # Check Python test files
+    $pythonIntegrationTest = Join-Path $clientDir "test_integration.py"
+    if (-not (Test-Path $pythonIntegrationTest)) {
+        $issues += "Python integration test not found: $pythonIntegrationTest"
+    }
+    
+    $pythonHealthCheck = Join-Path $clientDir "test_server_health.py"
+    if (-not (Test-Path $pythonHealthCheck)) {
+        $issues += "Python health check script not found: $pythonHealthCheck"
+    }
+    
+    if ($issues.Count -gt 0) {
+        Write-Host "✗ Prerequisites check failed:" -ForegroundColor Red
+        foreach ($issue in $issues) {
+            Write-Host "  - $issue" -ForegroundColor Red
+        }
+        return $false
+    }
+    
+    Write-Host "✓ All prerequisites satisfied" -ForegroundColor Green
+    return $true
+}
+
+# Function to run server health check
+function Invoke-ServerHealthCheck {
+    Write-Host "Running server health check..." -ForegroundColor Cyan
+    
+    $clientDir = Join-Path $projectRoot "client"
+    $healthScript = Join-Path $clientDir "test_server_health.py"
+    
+    try {
+        Push-Location $clientDir
+        
+        $process = Start-Process -FilePath "python" -ArgumentList @($healthScript, $ServerAddress) -Wait -PassThru -NoNewWindow
+        
+        if ($process.ExitCode -eq 0) {
+            Write-Host "✓ Server health check passed" -ForegroundColor Green
+            return $true
+        } else {
+            Write-Host "✗ Server health check failed" -ForegroundColor Red
+            Write-Host "Please ensure UESynth server is running and accessible." -ForegroundColor Yellow
+            return $false
+        }
+    }
+    catch {
+        Write-Host "✗ Health check execution failed: $($_.Exception.Message)" -ForegroundColor Red
+        return $false
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+# Function to run Python integration tests
+function Invoke-PythonIntegrationTests {
+    Write-Host "Running Python integration tests..." -ForegroundColor Cyan
+    Write-Host ("=" * 40) -ForegroundColor Cyan
+    
+    $clientDir = Join-Path $projectRoot "client"
+    $integrationScript = Join-Path $clientDir "test_integration.py"
+    
+    try {
+        Push-Location $clientDir
+        
+        $args = @($integrationScript)
+        if ($ServerAddress -ne "172.27.224.1:50051") {
+            $args += $ServerAddress
+        }
+        
+        if ($Verbose) {
+            Write-Host "Executing: python $($args -join ' ')" -ForegroundColor Gray
+        }
+        
+        $process = Start-Process -FilePath "python" -ArgumentList $args -Wait -PassThru -NoNewWindow
+        
+        if ($process.ExitCode -eq 0) {
+            Write-Host "✓ Python integration tests passed" -ForegroundColor Green
+            return $true
+        } else {
+            Write-Host "✗ Python integration tests failed" -ForegroundColor Red
+            return $false
+        }
+    }
+    catch {
+        Write-Host "✗ Python integration test execution failed: $($_.Exception.Message)" -ForegroundColor Red
+        return $false
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+# Function to validate C++ integration tests
+function Test-CppIntegrationTests {
+    Write-Host "Validating C++ integration tests..." -ForegroundColor Cyan
+    Write-Host ("=" * 40) -ForegroundColor Cyan
+    
+    $validationScript = Join-Path $projectRoot "Source\UESynth\Tests\ValidateIntegrationTests.ps1"
+    
+    try {
+        & $validationScript
+        
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "✓ C++ integration test validation passed" -ForegroundColor Green
+            return $true
+        } else {
+            Write-Host "✗ C++ integration test validation failed" -ForegroundColor Red
+            return $false
+        }
+    }
+    catch {
+        Write-Host "✗ C++ integration test validation failed: $($_.Exception.Message)" -ForegroundColor Red
+        return $false
+    }
+}
+
+# Function to run C++ integration tests
+function Invoke-CppIntegrationTests {
+    Write-Host "Running C++ integration tests..." -ForegroundColor Cyan
+    Write-Host ("=" * 40) -ForegroundColor Cyan
+    
+    # First validate the tests exist and are properly structured
+    if (-not (Test-CppIntegrationTests)) {
+        Write-Host "⚠ C++ integration test validation failed - skipping execution" -ForegroundColor Yellow
+        return $false
+    }
+    
+    # Use the cpp-test script to run integration tests specifically
+    $cppTestScript = Join-Path $scriptDir "cpp-test"
+    
+    if (-not (Test-Path $cppTestScript)) {
+        Write-Host "✗ C++ test script not found: $cppTestScript" -ForegroundColor Red
+        return $false
+    }
+    
+    try {
+        $args = @("-IntegrationOnly")
+        if ($Verbose) {
+            $args += "-Verbose"
+        }
+        
+        & $cppTestScript @args
+        
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "✓ C++ integration tests passed" -ForegroundColor Green
+            return $true
+        } else {
+            Write-Host "✗ C++ integration tests failed" -ForegroundColor Red
+            return $false
+        }
+    }
+    catch {
+        Write-Host "✗ C++ integration test execution failed: $($_.Exception.Message)" -ForegroundColor Red
+        return $false
+    }
+}
+
+# Function to run end-to-end communication tests
+function Invoke-EndToEndTests {
+    Write-Host "Running end-to-end communication tests..." -ForegroundColor Cyan
+    Write-Host ("=" * 45) -ForegroundColor Cyan
+    
+    # This would test actual Python client -> gRPC -> C++ server communication
+    # For now, we'll run a comprehensive test that exercises both sides
+    
+    $clientDir = Join-Path $projectRoot "client"
+    $e2eTestScript = Join-Path $clientDir "test_with_retry.py"
+    
+    if (Test-Path $e2eTestScript) {
+        try {
+            Push-Location $clientDir
+            
+            Write-Host "Running comprehensive client-server communication test..." -ForegroundColor Yellow
+            
+            $process = Start-Process -FilePath "python" -ArgumentList @($e2eTestScript) -Wait -PassThru -NoNewWindow
+            
+            if ($process.ExitCode -eq 0) {
+                Write-Host "✓ End-to-end communication tests passed" -ForegroundColor Green
+                return $true
+            } else {
+                Write-Host "✗ End-to-end communication tests failed" -ForegroundColor Red
+                return $false
+            }
+        }
+        catch {
+            Write-Host "✗ End-to-end test execution failed: $($_.Exception.Message)" -ForegroundColor Red
+            return $false
+        }
+        finally {
+            Pop-Location
+        }
+    } else {
+        Write-Host "⚠ End-to-end test script not found - using basic integration tests" -ForegroundColor Yellow
+        
+        # Fallback: run both Python and C++ tests as end-to-end validation
+        $pythonResult = Invoke-PythonIntegrationTests
+        $cppResult = Invoke-CppIntegrationTests
+        
+        return $pythonResult -and $cppResult
+    }
+}
+
+# Main execution
+try {
+    # Check prerequisites
+    if (-not (Test-Prerequisites)) {
+        Write-Host "✗ Prerequisites not met - cannot run integration tests" -ForegroundColor Red
+        exit 1
+    }
+    
+    Write-Host ""
+    
+    # Run health check if requested
+    if ($HealthCheck) {
+        if (-not (Invoke-ServerHealthCheck)) {
+            Write-Host "✗ Server health check failed - integration tests may not work properly" -ForegroundColor Red
+            Write-Host "Continuing with tests anyway..." -ForegroundColor Yellow
+        }
+        Write-Host ""
+    }
+    
+    # Track test results
+    $testResults = @{}
+    $allTestsPassed = $true
+    
+    # Run tests based on parameters
+    if (-not $CppOnly) {
+        Write-Host "🐍 Python Integration Tests" -ForegroundColor White
+        Write-Host ("=" * 30) -ForegroundColor White
+        $testResults["Python"] = Invoke-PythonIntegrationTests
+        $allTestsPassed = $allTestsPassed -and $testResults["Python"]
+        Write-Host ""
+    }
+    
+    if (-not $PythonOnly) {
+        Write-Host "⚙️ C++ Integration Tests" -ForegroundColor White
+        Write-Host ("=" * 25) -ForegroundColor White
+        $testResults["C++"] = Invoke-CppIntegrationTests
+        $allTestsPassed = $allTestsPassed -and $testResults["C++"]
+        Write-Host ""
+    }
+    
+    # Run end-to-end tests if both Python and C++ tests are enabled
+    if (-not $PythonOnly -and -not $CppOnly) {
+        Write-Host "🔄 End-to-End Communication Tests" -ForegroundColor White
+        Write-Host ("=" * 35) -ForegroundColor White
+        $testResults["End-to-End"] = Invoke-EndToEndTests
+        $allTestsPassed = $allTestsPassed -and $testResults["End-to-End"]
+        Write-Host ""
+    }
+    
+    # Summary
+    Write-Host "Integration Test Summary:" -ForegroundColor Cyan
+    Write-Host ("=" * 25) -ForegroundColor Cyan
+    
+    foreach ($testType in $testResults.Keys) {
+        $status = if ($testResults[$testType]) { "✓ PASS" } else { "✗ FAIL" }
+        $color = if ($testResults[$testType]) { "Green" } else { "Red" }
+        Write-Host "$testType`: $status" -ForegroundColor $color
+    }
+    
+    Write-Host ""
+    
+    if ($allTestsPassed) {
+        Write-Host "🎉 All integration tests passed!" -ForegroundColor Green
+        Write-Host "Python-C++ communication is working correctly." -ForegroundColor Green
+        exit 0
+    } else {
+        Write-Host "❌ Some integration tests failed!" -ForegroundColor Red
+        Write-Host ""
+        Write-Host "Troubleshooting Guide:" -ForegroundColor Yellow
+        Write-Host "1. Ensure UESynth server is running in Unreal Engine" -ForegroundColor Yellow
+        Write-Host "2. Check that gRPC server is listening on $ServerAddress" -ForegroundColor Yellow
+        Write-Host "3. Verify UE is in Play mode with active viewport" -ForegroundColor Yellow
+        Write-Host "4. Run health check: .\check\integration -HealthCheck" -ForegroundColor Yellow
+        Write-Host "5. Check individual components:" -ForegroundColor Yellow
+        Write-Host "   - Python only: .\check\integration -PythonOnly" -ForegroundColor Yellow
+        Write-Host "   - C++ only: .\check\integration -CppOnly" -ForegroundColor Yellow
+        exit 1
+    }
+}
+catch {
+    Write-Host "✗ Integration testing failed: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host $_.ScriptStackTrace -ForegroundColor Red
+    exit 1
+}

@@ -1,0 +1,74 @@
+# Cppcheck suppressions for UESynth project
+# This file contains suppressions for false positives and UE-specific patterns
+
+# Suppress warnings for UE macro patterns
+syntaxError:*UCLASS*
+syntaxError:*USTRUCT*
+syntaxError:*UENUM*
+syntaxError:*UFUNCTION*
+syntaxError:*UPROPERTY*
+syntaxError:*GENERATED_BODY*
+syntaxError:*GENERATED_UCLASS_BODY*
+
+# Suppress warnings for UE logging macros
+syntaxError:*UE_LOG*
+syntaxError:*LogTemp*
+
+# Suppress warnings for UE string types
+noExplicitConstructor:FString
+noExplicitConstructor:FName
+noExplicitConstructor:FText
+
+# Suppress warnings for UE container types
+useStlAlgorithm:TArray*
+useStlAlgorithm:TMap*
+useStlAlgorithm:TSet*
+
+# Suppress warnings for gRPC generated code patterns
+syntaxError:*grpc::*
+syntaxError:*google::protobuf::*
+unusedFunction:*_reflection_*
+unusedFunction:*descriptor_table_*
+
+# Suppress warnings for async/threading patterns common in UE
+unusedVariable:*Future*
+unusedVariable:*Promise*
+
+# Suppress warnings for UE-specific casting patterns
+cstyleCast:*Cast<*
+cstyleCast:*StaticCast<*
+
+# Suppress warnings for UE memory management
+memleakOnRealloc:*FMemory::*
+memleakOnRealloc:*GMalloc*
+
+# Suppress warnings for UE delegate patterns
+syntaxError:*DECLARE_DELEGATE*
+syntaxError:*DECLARE_MULTICAST_DELEGATE*
+syntaxError:*DECLARE_DYNAMIC_DELEGATE*
+
+# Suppress warnings for platform-specific code
+preprocessorErrorDirective:*PLATFORM_*
+preprocessorErrorDirective:*WITH_EDITOR*
+
+# Suppress warnings for third-party headers
+*:*/ThirdParty/*
+*:*/Intermediate/*
+*:*/Binaries/*
+*:*/Generated/*
+
+# Suppress specific warnings that are not relevant for UE projects
+passedByValue:FVector
+passedByValue:FRotator
+passedByValue:FTransform
+passedByValue:FColor
+
+# Suppress warnings for UE smart pointer patterns
+nullPointerRedundantCheck:TSharedPtr*
+nullPointerRedundantCheck:TWeakPtr*
+nullPointerRedundantCheck:TUniquePtr*
+
+# Suppress warnings for UE object reference patterns
+nullPointerRedundantCheck:*GetWorld*
+nullPointerRedundantCheck:*GetGameInstance*
+nullPointerRedundantCheck:*GetPlayerController*

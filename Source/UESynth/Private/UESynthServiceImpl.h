@@ -3,8 +3,10 @@
 
 #pragma once
 
-#include "Generated/uesynth.grpc.pb.h"
+#include "pb/uesynth.grpc.pb.h"
+#include "pb/uesynth.pb.h"
 #include <grpcpp/grpcpp.h>
+#include <google/protobuf/empty.pb.h>
 
 class UESynthServiceImpl final : public uesynth::UESynthService::Service {
 public:
@@ -27,7 +29,7 @@ public:
     grpc::Status ListObjects(grpc::ServerContext* context, const google::protobuf::Empty* request, uesynth::ListObjectsResponse* reply) override;
     grpc::Status SetLighting(grpc::ServerContext* context, const uesynth::SetLightingRequest* request, uesynth::CommandResponse* reply) override;
 
-private:
-    // Helper method to process individual actions
+public:
+    // Helper method to process individual actions (public for testing)
     grpc::Status ProcessAction(const uesynth::ActionRequest& request, uesynth::FrameResponse* response);
 }; 

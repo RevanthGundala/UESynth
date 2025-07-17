@@ -1,0 +1,59 @@
+#!/usr/bin/env pwsh
+
+# Copyright (c) 2025 UESynth Project
+# SPDX-License-Identifier: MIT
+
+<#
+.SYNOPSIS
+    Build cache management utility for UESynth plugin.
+
+.DESCRIPTION
+    This script provides a simple interface for managing build cache,
+    including viewing cache info, cleaning cache, and manual cache operations.
+#>
+
+param(
+    [ValidateSet("info", "clean", "generate-key")]
+    [string]$Action = "info",
+    [string]$Platform = "Win64",
+    [string]$Configuration = "Development"
+)
+
+# Get script directory and project root
+$scriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
+$projectRoot = Split-Path $scriptDir -Parent
+
+# Path to the cache management script
+$cacheScript = Join-Path $projectRoot "scripts\Build-Cache.ps1"
+
+Write-Host "UESynth Build Cache Manager" -ForegroundColor Cyan
+Write-Host "===========================" -ForegroundColor Cyan
+
+if (-not (Test-Path $cacheScript)) {
+    Write-Host "Cache management script not found: $cacheScript" -ForegroundColor Red
+    exit 1
+}
+
+# Prepare arguments for the cache script
+$cacheArgs = @(
+    "-Action", $Action,
+    "-Platform", $Platform,
+    "-Configuration", $Configuration
+)
+
+try {
+    # Execute the cache management script
+    & $cacheScript @cacheArgs
+    
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "`n✓ Cache operation completed successfully!" -ForegroundColor Green
+        exit 0
+    } else {
+        Write-Host "`n✗ Cache operation failed!" -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+}
+catch {
+    Write-Host "`n✗ Cache script execution failed: $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
+}

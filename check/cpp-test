@@ -1,0 +1,228 @@
+#!/usr/bin/env pwsh
+
+# Copyright (c) 2025 UESynth Project
+# SPDX-License-Identifier: MIT
+
+<#
+.SYNOPSIS
+    Local C++ test execution script for UESynth plugin.
+
+.DESCRIPTION
+    This script provides a simple interface for local C++ test execution,
+    including test result formatting and reporting capabilities.
+
+.PARAMETER UnitOnly
+    Run only unit tests
+
+.PARAMETER IntegrationOnly
+    Run only integration tests
+
+.PARAMETER Verbose
+    Enable verbose output for debugging
+
+.PARAMETER Coverage
+    Generate test coverage report (requires coverage tools)
+
+.PARAMETER Filter
+    Filter tests by name pattern
+
+.PARAMETER OutputDir
+    Directory for test results. Default: TestResults
+
+.EXAMPLE
+    .\check\cpp-test
+    Run all C++ tests
+
+.EXAMPLE
+    .\check\cpp-test -UnitOnly -Verbose
+    Run only unit tests with verbose output
+
+.EXAMPLE
+    .\check\cpp-test -Coverage -OutputDir "coverage-results"
+    Run tests with coverage reporting
+#>
+
+param(
+    [switch]$UnitOnly,
+    [switch]$IntegrationOnly,
+    [switch]$Verbose,
+    [switch]$Coverage,
+    [string]$Filter = "",
+    [string]$OutputDir = "TestResults"
+)
+
+# Get script directory and project root
+$scriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
+$projectRoot = Split-Path $scriptDir -Parent
+
+# Path to the test automation script
+$testScript = Join-Path $projectRoot "Source\UESynth\Tests\AutomateTests.ps1"
+
+Write-Host "UESynth C++ Test Execution" -ForegroundColor Cyan
+Write-Host "==========================" -ForegroundColor Cyan
+
+# Check if test infrastructure exists
+if (-not (Test-Path $testScript)) {
+    Write-Host "✗ Test automation script not found: $testScript" -ForegroundColor Red
+    Write-Host "Please ensure the C++ test infrastructure is set up." -ForegroundColor Yellow
+    exit 1
+}
+
+# Validate test infrastructure
+$validationScript = Join-Path $projectRoot "Source\UESynth\Tests\ValidateTestInfrastructure.ps1"
+if (Test-Path $validationScript) {
+    Write-Host "Validating test infrastructure..." -ForegroundColor Yellow
+    try {
+        & $validationScript
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "✗ Test infrastructure validation failed!" -ForegroundColor Red
+            Write-Host "Please fix the infrastructure issues before running tests." -ForegroundColor Yellow
+            exit 1
+        }
+        Write-Host "✓ Test infrastructure validation passed" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "⚠ Test infrastructure validation encountered issues: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "Continuing with test execution..." -ForegroundColor Yellow
+    }
+    Write-Host ""
+}
+
+# Prepare arguments for the test automation script
+$testArgs = @(
+    "-OutputDir", $OutputDir,
+    "-GenerateReport"
+)
+
+if ($UnitOnly) {
+    $testArgs += "-UnitOnly"
+    Write-Host "Running unit tests only" -ForegroundColor Yellow
+}
+
+if ($IntegrationOnly) {
+    $testArgs += "-IntegrationOnly"
+    Write-Host "Running integration tests only" -ForegroundColor Yellow
+}
+
+if ($Verbose) {
+    $testArgs += "-Verbose"
+    Write-Host "Verbose output enabled" -ForegroundColor Yellow
+}
+
+if ($Filter) {
+    $testArgs += "-TestFilter", $Filter
+    Write-Host "Test filter: $Filter" -ForegroundColor Yellow
+}
+
+# Coverage reporting setup
+if ($Coverage) {
+    Write-Host "Coverage reporting requested" -ForegroundColor Yellow
+    
+    # Check if coverage tools are available
+    $opencppcoverage = Get-Command "OpenCppCoverage.exe" -ErrorAction SilentlyContinue
+    if ($opencppcoverage) {
+        Write-Host "✓ OpenCppCoverage found for coverage reporting" -ForegroundColor Green
+        $coverageDir = Join-Path $OutputDir "Coverage"
+        if (-not (Test-Path $coverageDir)) {
+            New-Item -ItemType Directory -Path $coverageDir -Force | Out-Null
+        }
+        
+        # Wrap test execution with coverage
+        $coverageArgs = @(
+            "--sources", (Join-Path $projectRoot "Source\UESynth"),
+            "--export_type", "html:$coverageDir",
+            "--export_type", "cobertura:$coverageDir\coverage.xml",
+            "--",
+            "pwsh", "-File", $testScript
+        ) + $testArgs
+        
+        Write-Host "Executing tests with coverage analysis..." -ForegroundColor Green
+        
+        try {
+            & $opencppcoverage @coverageArgs
+            $exitCode = $LASTEXITCODE
+            
+            if ($exitCode -eq 0) {
+                Write-Host "`n✓ Tests completed with coverage analysis!" -ForegroundColor Green
+                Write-Host "Coverage report available at: $coverageDir\index.html" -ForegroundColor Cyan
+            } else {
+                Write-Host "`n✗ Tests failed during coverage analysis!" -ForegroundColor Red
+            }
+        }
+        catch {
+            Write-Host "`n✗ Coverage analysis failed: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "Falling back to regular test execution..." -ForegroundColor Yellow
+            $Coverage = $false
+        }
+    } else {
+        Write-Host "⚠ OpenCppCoverage not found - coverage reporting disabled" -ForegroundColor Yellow
+        Write-Host "Install OpenCppCoverage for coverage analysis: https://github.com/OpenCppCoverage/OpenCppCoverage" -ForegroundColor Yellow
+        $Coverage = $false
+    }
+}
+
+# Execute tests without coverage if coverage failed or wasn't requested
+if (-not $Coverage) {
+    Write-Host "Executing C++ tests..." -ForegroundColor Green
+    
+    try {
+        & $testScript @testArgs
+        $exitCode = $LASTEXITCODE
+        
+        if ($exitCode -eq 0) {
+            Write-Host "`n✓ C++ tests completed successfully!" -ForegroundColor Green
+        } else {
+            Write-Host "`n✗ C++ tests failed!" -ForegroundColor Red
+        }
+    }
+    catch {
+        Write-Host "`n✗ Test execution failed: $($_.Exception.Message)" -ForegroundColor Red
+        $exitCode = 1
+    }
+}
+
+# Display results summary
+Write-Host "`nTest Results Summary:" -ForegroundColor Cyan
+Write-Host "====================" -ForegroundColor Cyan
+
+$resultsDir = Join-Path $projectRoot $OutputDir
+if (Test-Path $resultsDir) {
+    Write-Host "Results directory: $resultsDir" -ForegroundColor White
+    
+    # Check for HTML report
+    $htmlReport = Join-Path $resultsDir "test-summary.html"
+    if (Test-Path $htmlReport) {
+        Write-Host "HTML Report: $htmlReport" -ForegroundColor Cyan
+    }
+    
+    # Check for XML reports
+    $xmlReports = Get-ChildItem -Path (Join-Path $resultsDir "Reports") -Filter "*.xml" -ErrorAction SilentlyContinue
+    if ($xmlReports) {
+        Write-Host "XML Reports: $($xmlReports.Count) files in $($resultsDir)\Reports" -ForegroundColor Cyan
+    }
+    
+    # Check for log files
+    $logFiles = Get-ChildItem -Path (Join-Path $resultsDir "Logs") -Filter "*.log" -ErrorAction SilentlyContinue
+    if ($logFiles) {
+        Write-Host "Log Files: $($logFiles.Count) files in $($resultsDir)\Logs" -ForegroundColor Cyan
+    }
+    
+    # Coverage report
+    if ($Coverage) {
+        $coverageReport = Join-Path $resultsDir "Coverage\index.html"
+        if (Test-Path $coverageReport) {
+            Write-Host "Coverage Report: $coverageReport" -ForegroundColor Cyan
+        }
+    }
+} else {
+    Write-Host "No results directory found" -ForegroundColor Yellow
+}
+
+Write-Host ""
+if ($exitCode -eq 0) {
+    Write-Host "All checks passed! ✅" -ForegroundColor Green
+} else {
+    Write-Host "Some tests failed! ❌" -ForegroundColor Red
+}
+
+exit $exitCode

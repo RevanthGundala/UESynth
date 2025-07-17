@@ -1,0 +1,72 @@
+#!/usr/bin/env pwsh
+
+# Copyright (c) 2025 UESynth Project
+# SPDX-License-Identifier: MIT
+
+<#
+.SYNOPSIS
+    Local C++ build validation script for UESynth plugin.
+
+.DESCRIPTION
+    This script provides a simple interface for local C++ build validation,
+    mirroring the CI build process for development workflow.
+#>
+
+param(
+    [switch]$Clean,
+    [switch]$Verbose,
+    [switch]$UseCache,
+    [string]$Platform = "Win64",
+    [string]$Configuration = "Development"
+)
+
+# Get script directory and project root
+$scriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
+$projectRoot = Split-Path $scriptDir -Parent
+
+# Path to the main build script
+$buildScript = Join-Path $projectRoot "scripts\Build-UEPlugin.ps1"
+
+Write-Host "UESynth C++ Build Validation" -ForegroundColor Cyan
+Write-Host "=============================" -ForegroundColor Cyan
+
+# Prepare arguments for the main build script
+$buildArgs = @(
+    "-Platform", $Platform,
+    "-Configuration", $Configuration,
+    "-ValidateDependencies"
+)
+
+if ($Clean) {
+    $buildArgs += "-Clean"
+    Write-Host "Clean build requested" -ForegroundColor Yellow
+}
+
+if ($Verbose) {
+    $buildArgs += "-Verbose"
+    Write-Host "Verbose output enabled" -ForegroundColor Yellow
+}
+
+if ($UseCache) {
+    $buildArgs += "-UseCache"
+    Write-Host "Build caching enabled" -ForegroundColor Yellow
+}
+
+Write-Host "Building UESynth plugin for $Platform ($Configuration)..." -ForegroundColor Green
+
+try {
+    # Execute the main build script
+    & $buildScript @buildArgs
+    
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "`n✓ C++ build validation completed successfully!" -ForegroundColor Green
+        exit 0
+    } else {
+        Write-Host "`n✗ C++ build validation failed!" -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+}
+catch {
+    Write-Host "`n✗ Build script execution failed: $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
+}

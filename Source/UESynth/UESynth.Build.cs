@@ -117,7 +117,7 @@ public class UESynth : ModuleRules
 		
 		PrivateIncludePaths.AddRange(
 			new string[] {
-				Path.Combine(ModuleDirectory, "Private/Generated")
+				Path.Combine(ModuleDirectory, "../../GeneratedCode/Private")
 			}
 		);
 
@@ -137,6 +137,34 @@ public class UESynth : ModuleRules
 				Path.Combine(TurboLinkThirdPartyPath, "abseil/include"),
 				Path.Combine(TurboLinkThirdPartyPath, "re2/include")
 			});
+			
+			// Add TurboLink libraries for linking
+			if (Target.Platform == UnrealTargetPlatform.Win64)
+			{
+				string[] RequiredLibs = {
+					"libprotobuf.lib",
+					"grpc++.lib",
+					"grpc.lib",
+					"gpr.lib",
+					"address_sorting.lib",
+					"upb.lib"
+				};
+				
+				foreach (string lib in RequiredLibs)
+				{
+					string protobufLibPath = Path.Combine(TurboLinkThirdPartyPath, "protobuf/lib", lib);
+					string grpcLibPath = Path.Combine(TurboLinkThirdPartyPath, "grpc/lib", lib);
+					
+					if (File.Exists(protobufLibPath))
+					{
+						PublicAdditionalLibraries.Add(protobufLibPath);
+					}
+					else if (File.Exists(grpcLibPath))
+					{
+						PublicAdditionalLibraries.Add(grpcLibPath);
+					}
+				}
+			}
 		}
 		else
 		{

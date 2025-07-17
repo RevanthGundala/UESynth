@@ -1,0 +1,286 @@
+#!/usr/bin/env pwsh
+
+# Copyright (c) 2025 UESynth Project
+# SPDX-License-Identifier: MIT
+
+<#
+.SYNOPSIS
+    Local C++ code formatting script for UESynth plugin.
+
+.DESCRIPTION
+    This script provides C++ code formatting validation and auto-fix capabilities
+    using clang-format with UE-specific coding standards.
+
+.PARAMETER Check
+    Only check formatting without making changes (default behavior)
+
+.PARAMETER Fix
+    Automatically fix formatting issues
+
+.PARAMETER Verbose
+    Enable verbose output showing all processed files
+
+.PARAMETER Path
+    Specific path to format (file or directory). Default: Source/UESynth
+
+.PARAMETER Extensions
+    File extensions to process. Default: cpp,h,hpp,c,cc
+
+.EXAMPLE
+    .\check\cpp-format
+    Check C++ formatting without making changes
+
+.EXAMPLE
+    .\check\cpp-format -Fix
+    Automatically fix C++ formatting issues
+
+.EXAMPLE
+    .\check\cpp-format -Check -Path "Source/UESynth/Private" -Verbose
+    Check formatting for specific directory with verbose output
+#>
+
+param(
+    [switch]$Check = $true,
+    [switch]$Fix,
+    [switch]$Verbose,
+    [string]$Path = "Source/UESynth",
+    [string]$Extensions = "cpp,h,hpp,c,cc"
+)
+
+# Get script directory and project root
+$scriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
+$projectRoot = Split-Path $scriptDir -Parent
+
+# If Fix is specified, disable Check mode
+if ($Fix) {
+    $Check = $false
+}
+
+Write-Host "UESynth C++ Code Formatting" -ForegroundColor Cyan
+Write-Host "===========================" -ForegroundColor Cyan
+
+# Check if clang-format is available
+$clangFormat = Get-Command "clang-format" -ErrorAction SilentlyContinue
+if (-not $clangFormat) {
+    Write-Host "✗ clang-format not found in PATH" -ForegroundColor Red
+    Write-Host "Please install clang-format:" -ForegroundColor Yellow
+    Write-Host "  - Windows: Install LLVM from https://llvm.org/builds/" -ForegroundColor Yellow
+    Write-Host "  - Or use: winget install LLVM.LLVM" -ForegroundColor Yellow
+    Write-Host "  - Or use: choco install llvm" -ForegroundColor Yellow
+    exit 1
+}
+
+Write-Host "✓ clang-format found: $($clangFormat.Source)" -ForegroundColor Green
+
+# Check if .clang-format config exists
+$clangFormatConfig = Join-Path $projectRoot ".clang-format"
+if (-not (Test-Path $clangFormatConfig)) {
+    Write-Host "✗ .clang-format configuration not found: $clangFormatConfig" -ForegroundColor Red
+    Write-Host "Please ensure the .clang-format file exists in the project root." -ForegroundColor Yellow
+    exit 1
+}
+
+Write-Host "✓ clang-format configuration found" -ForegroundColor Green
+
+# Resolve target path
+$targetPath = if ([System.IO.Path]::IsPathRooted($Path)) { 
+    $Path 
+} else { 
+    Join-Path $projectRoot $Path 
+}
+
+if (-not (Test-Path $targetPath)) {
+    Write-Host "✗ Target path not found: $targetPath" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Target path: $targetPath" -ForegroundColor Cyan
+Write-Host "Extensions: $Extensions" -ForegroundColor Cyan
+Write-Host "Mode: $(if ($Fix) { 'FIX' } else { 'CHECK' })" -ForegroundColor Cyan
+Write-Host ""
+
+# Function to get C++ files
+function Get-CppFiles {
+    param([string]$SearchPath, [string[]]$FileExtensions)
+    
+    $files = @()
+    foreach ($ext in $FileExtensions) {
+        $pattern = "*.$ext"
+        if (Test-Path $SearchPath -PathType Container) {
+            $files += Get-ChildItem -Path $SearchPath -Filter $pattern -Recurse -File
+        } elseif (Test-Path $SearchPath -PathType Leaf) {
+            if ($SearchPath -match "\.($($FileExtensions -join '|'))$") {
+                $files += Get-Item $SearchPath
+            }
+        }
+    }
+    
+    # Filter out generated code and third-party files
+    $filteredFiles = $files | Where-Object {
+        $relativePath = $_.FullName.Substring($projectRoot.Length + 1)
+        -not ($relativePath -match "(Generated|ThirdParty|Intermediate|Binaries)" -or
+              $_.Name -match "(\.generated\.|\.gen\.)")
+    }
+    
+    return $filteredFiles
+}
+
+# Function to check file formatting
+function Test-FileFormatting {
+    param([System.IO.FileInfo]$File)
+    
+    try {
+        # Get formatted output from clang-format
+        $formattedContent = & clang-format --style=file $File.FullName
+        
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "✗ clang-format failed for: $($File.Name)" -ForegroundColor Red
+            return $false
+        }
+        
+        # Compare with original content
+        $originalContent = Get-Content $File.FullName -Raw
+        
+        if ($formattedContent -ne $originalContent) {
+            return $false
+        }
+        
+        return $true
+    }
+    catch {
+        Write-Host "✗ Error checking formatting for $($File.Name): $($_.Exception.Message)" -ForegroundColor Red
+        return $false
+    }
+}
+
+# Function to fix file formatting
+function Repair-FileFormatting {
+    param([System.IO.FileInfo]$File)
+    
+    try {
+        # Apply formatting in-place
+        & clang-format --style=file -i $File.FullName
+        
+        if ($LASTEXITCODE -eq 0) {
+            return $true
+        } else {
+            Write-Host "✗ Failed to format: $($File.Name)" -ForegroundColor Red
+            return $false
+        }
+    }
+    catch {
+        Write-Host "✗ Error formatting $($File.Name): $($_.Exception.Message)" -ForegroundColor Red
+        return $false
+    }
+}
+
+# Get all C++ files to process
+$extensionArray = $Extensions -split ','
+$cppFiles = Get-CppFiles -SearchPath $targetPath -FileExtensions $extensionArray
+
+if ($cppFiles.Count -eq 0) {
+    Write-Host "No C++ files found to process." -ForegroundColor Yellow
+    exit 0
+}
+
+Write-Host "Found $($cppFiles.Count) C++ files to process" -ForegroundColor Green
+Write-Host ""
+
+# Process files
+$processedCount = 0
+$issueCount = 0
+$fixedCount = 0
+$errorCount = 0
+
+foreach ($file in $cppFiles) {
+    $processedCount++
+    $relativePath = $file.FullName.Substring($projectRoot.Length + 1)
+    
+    if ($Verbose) {
+        Write-Host "Processing: $relativePath" -ForegroundColor Gray
+    }
+    
+    if ($Fix) {
+        # Fix mode: apply formatting
+        if (Repair-FileFormatting $file) {
+            $fixedCount++
+            if ($Verbose) {
+                Write-Host "  ✓ Formatted" -ForegroundColor Green
+            }
+        } else {
+            $errorCount++
+        }
+    } else {
+        # Check mode: validate formatting
+        if (-not (Test-FileFormatting $file)) {
+            $issueCount++
+            Write-Host "✗ Formatting issues: $relativePath" -ForegroundColor Red
+            
+            if ($Verbose) {
+                # Show diff preview
+                try {
+                    $formattedContent = & clang-format --style=file $file.FullName
+                    $originalContent = Get-Content $file.FullName -Raw
+                    
+                    # Simple diff indication
+                    $originalLines = ($originalContent -split "`n").Count
+                    $formattedLines = ($formattedContent -split "`n").Count
+                    
+                    if ($originalLines -ne $formattedLines) {
+                        Write-Host "  Line count difference: $originalLines -> $formattedLines" -ForegroundColor Yellow
+                    }
+                }
+                catch {
+                    Write-Host "  Could not generate diff preview" -ForegroundColor Yellow
+                }
+            }
+        } elseif ($Verbose) {
+            Write-Host "  ✓ Properly formatted" -ForegroundColor Green
+        }
+    }
+}
+
+# Summary
+Write-Host ""
+Write-Host "Formatting Summary:" -ForegroundColor Cyan
+Write-Host "==================" -ForegroundColor Cyan
+Write-Host "Files processed: $processedCount" -ForegroundColor White
+
+if ($Fix) {
+    Write-Host "Files formatted: $fixedCount" -ForegroundColor Green
+    if ($errorCount -gt 0) {
+        Write-Host "Formatting errors: $errorCount" -ForegroundColor Red
+    }
+    
+    if ($fixedCount -gt 0) {
+        Write-Host ""
+        Write-Host "✓ C++ code formatting applied successfully!" -ForegroundColor Green
+        Write-Host "Files have been automatically formatted according to .clang-format rules." -ForegroundColor Yellow
+    } elseif ($errorCount -eq 0) {
+        Write-Host ""
+        Write-Host "✓ All files were already properly formatted!" -ForegroundColor Green
+    }
+} else {
+    Write-Host "Formatting issues: $issueCount" -ForegroundColor $(if ($issueCount -gt 0) { "Red" } else { "Green" })
+    
+    if ($issueCount -gt 0) {
+        Write-Host ""
+        Write-Host "✗ C++ formatting validation failed!" -ForegroundColor Red
+        Write-Host "Run 'check/cpp-format -Fix' to automatically fix formatting issues." -ForegroundColor Yellow
+        Write-Host "Or use: clang-format -i <file> to format individual files." -ForegroundColor Yellow
+    } else {
+        Write-Host ""
+        Write-Host "✓ All C++ files are properly formatted!" -ForegroundColor Green
+    }
+}
+
+# Integration with check/all
+if ($issueCount -eq 0 -and $errorCount -eq 0) {
+    Write-Host ""
+    Write-Host "All formatting checks passed! ✅" -ForegroundColor Green
+    exit 0
+} else {
+    Write-Host ""
+    Write-Host "Formatting issues detected! ❌" -ForegroundColor Red
+    exit 1
+}

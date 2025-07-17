@@ -7,7 +7,7 @@ on:
     branches: [ main, develop ]
 
 jobs:
-  check:
+  python-checks:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -47,4 +47,292 @@ jobs:
         file: ./client/coverage.xml
         flags: unittests
         name: codecov-umbrella
-        fail_ci_if_error: true 
+        fail_ci_if_error: true
+
+  cpp-quality-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install LLVM and Clang tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang-tidy clang-format cppcheck
+        
+        # Verify installations
+        clang-tidy --version
+        clang-format --version
+        cppcheck --version
+    
+    - name: Cache clang-tidy results
+      uses: actions/cache@v4
+      with:
+        path: |
+          .clang-tidy-cache
+        key: clang-tidy-${{ runner.os }}-${{ hashFiles('Source/**/*.cpp', 'Source/**/*.h', '.clang-tidy') }}
+        restore-keys: |
+          clang-tidy-${{ runner.os }}-
+    
+    - name: Run C++ code formatting check
+      shell: pwsh
+      run: |
+        ./check/cpp-format --check --verbose
+    
+    - name: Run clang-tidy static analysis
+      shell: pwsh
+      run: |
+        ./scripts/Run-ClangTidy.ps1 -Verbose -OutputFile "clang-tidy-report.txt"
+    
+    - name: Run cppcheck static analysis
+      shell: pwsh
+      run: |
+        ./scripts/Run-CppCheck.ps1 -Verbose -OutputFile "cppcheck-report.txt"
+    
+    - name: Upload clang-tidy report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: clang-tidy-report
+        path: clang-tidy-report.txt
+        retention-days: 30
+    
+    - name: Upload cppcheck report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: cppcheck-report
+        path: cppcheck-report.txt
+        retention-days: 30
+    
+    - name: Comment PR with clang-tidy results
+      if: github.event_name == 'pull_request' && failure()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = 'clang-tidy-report.txt';
+          
+          if (fs.existsSync(path)) {
+            const report = fs.readFileSync(path, 'utf8');
+            const body = `## 🔍 Clang-Tidy Static Analysis Results
+            
+            The static analysis found some issues in the C++ code:
+            
+            \`\`\`
+            ${report.substring(0, 5000)}${report.length > 5000 ? '\n... (truncated)' : ''}
+            \`\`\`
+            
+            Please review and fix these issues before merging.
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+          }
+
+  cpp-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows builds - highest priority
+          - os: windows-latest
+            ue-version: "5.3"
+            platform: "Win64"
+            configuration: "Development"
+            priority: "high"
+          - os: windows-latest
+            ue-version: "5.2"
+            platform: "Win64"
+            configuration: "Development"
+            priority: "medium"
+          - os: windows-latest
+            ue-version: "5.1"
+            platform: "Win64"
+            configuration: "Development"
+            priority: "low"
+          
+          # Linux builds
+          - os: ubuntu-latest
+            ue-version: "5.3"
+            platform: "Linux"
+            configuration: "Development"
+            priority: "high"
+          - os: ubuntu-latest
+            ue-version: "5.2"
+            platform: "Linux"
+            configuration: "Development"
+            priority: "medium"
+          
+          # macOS builds
+          - os: macos-latest
+            ue-version: "5.3"
+            platform: "Mac"
+            configuration: "Development"
+            priority: "medium"
+    
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.priority == 'low' }}
+    timeout-minutes: 60
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup Unreal Engine
+      uses: ./.github/actions/setup-ue
+      with:
+        ue-version: ${{ matrix.ue-version }}
+    
+    - name: Cache UE Build Dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          .cache/build
+          Binaries
+          Intermediate
+          Plugins/UESynth/Binaries
+          Plugins/UESynth/Intermediate
+        key: ue-build-${{ matrix.ue-version }}-${{ matrix.platform }}-${{ matrix.configuration }}-${{ runner.os }}-${{ hashFiles('Source/**/*.cpp', 'Source/**/*.h', '*.uplugin', '*.uproject') }}
+        restore-keys: |
+          ue-build-${{ matrix.ue-version }}-${{ matrix.platform }}-${{ matrix.configuration }}-${{ runner.os }}-
+          ue-build-${{ matrix.ue-version }}-${{ matrix.platform }}-${{ runner.os }}-
+          ue-build-${{ matrix.ue-version }}-${{ runner.os }}-
+    
+    - name: Install Platform Dependencies (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential clang mono-complete
+    
+    - name: Install Platform Dependencies (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        # Install Xcode command line tools if not present
+        xcode-select --install || true
+        # Install mono for UE build tools
+        brew install mono || true
+    
+    - name: Validate Dependencies (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        ./scripts/Build-UEPlugin.ps1 -ValidateDependencies -Platform ${{ matrix.platform }} -Configuration ${{ matrix.configuration }} -Verbose
+    
+    - name: Validate Dependencies (Linux/macOS)
+      if: runner.os == 'Linux' || runner.os == 'macOS'
+      shell: bash
+      run: |
+        echo "Validating dependencies for ${{ matrix.platform }} on ${{ runner.os }}..."
+        
+        # Check if UE is properly set up
+        if [[ -z "$UE_ROOT" ]]; then
+          echo "❌ UE_ROOT not set"
+          exit 1
+        fi
+        
+        if [[ ! -d "$UE_ROOT" ]]; then
+          echo "❌ UE installation not found at $UE_ROOT"
+          exit 1
+        fi
+        
+        echo "✅ UE installation found at $UE_ROOT"
+        
+        # Check for project file
+        if [[ ! -f "UESynth.uplugin" ]]; then
+          echo "❌ UESynth.uplugin not found"
+          exit 1
+        fi
+        
+        echo "✅ Plugin file found"
+        echo "Dependencies validation completed"
+    
+    - name: Build UESynth Plugin (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        ./scripts/Build-UEPlugin.ps1 -Platform ${{ matrix.platform }} -Configuration ${{ matrix.configuration }} -UseCache -Verbose
+    
+    - name: Build UESynth Plugin (Linux/macOS)
+      if: runner.os == 'Linux' || runner.os == 'macOS'
+      shell: bash
+      run: |
+        echo "Building UESynth Plugin for ${{ matrix.platform }} on ${{ runner.os }}..."
+        
+        # For CI testing, we'll simulate the build process
+        # In a real scenario, this would call the actual UBT
+        
+        UBT_EXECUTABLE=""
+        if [[ "${{ runner.os }}" == "Linux" ]]; then
+          UBT_EXECUTABLE="$UE_ROOT/Engine/Binaries/Linux/UnrealBuildTool"
+        else
+          UBT_EXECUTABLE="$UE_ROOT/Engine/Binaries/Mac/UnrealBuildTool"
+        fi
+        
+        if [[ ! -f "$UBT_EXECUTABLE" ]]; then
+          echo "❌ UnrealBuildTool not found at $UBT_EXECUTABLE"
+          exit 1
+        fi
+        
+        # Execute mock build
+        echo "Executing: $UBT_EXECUTABLE UESynthEditor ${{ matrix.platform }} ${{ matrix.configuration }} $(pwd)/UESynth.uplugin"
+        "$UBT_EXECUTABLE" UESynthEditor ${{ matrix.platform }} ${{ matrix.configuration }} "$(pwd)/UESynth.uplugin" -WaitMutex
+        
+        BUILD_EXIT_CODE=$?
+        if [[ $BUILD_EXIT_CODE -eq 0 ]]; then
+          echo "✅ Build completed successfully"
+          
+          # Create mock build artifacts for testing
+          mkdir -p Binaries/${{ matrix.platform }}
+          mkdir -p Plugins/UESynth/Binaries/${{ matrix.platform }}
+          
+          echo "Mock build artifact" > Binaries/${{ matrix.platform }}/UESynth.so
+          echo "Mock plugin artifact" > Plugins/UESynth/Binaries/${{ matrix.platform }}/UESynth.so
+        else
+          echo "❌ Build failed with exit code $BUILD_EXIT_CODE"
+          exit $BUILD_EXIT_CODE
+        fi
+    
+    - name: Collect Build Artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ue-build-artifacts-${{ matrix.ue-version }}-${{ matrix.platform }}-${{ matrix.configuration }}-${{ runner.os }}
+        path: |
+          Binaries/
+          Plugins/UESynth/Binaries/
+          Logs/
+        retention-days: 7
+    
+    - name: Upload Build Logs
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ue-build-logs-${{ matrix.ue-version }}-${{ matrix.platform }}-${{ matrix.configuration }}-${{ runner.os }}
+        path: |
+          Logs/
+          *.log
+        retention-days: 14
+    
+    - name: Build Summary
+      if: always()
+      shell: bash
+      run: |
+        echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Platform**: ${{ matrix.platform }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **OS**: ${{ runner.os }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **UE Version**: ${{ matrix.ue-version }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Configuration**: ${{ matrix.configuration }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Priority**: ${{ matrix.priority }}" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ "${{ job.status }}" == "success" ]]; then
+          echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- **Status**: ❌ Failed" >> $GITHUB_STEP_SUMMARY
+        fi 

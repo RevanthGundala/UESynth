@@ -14,11 +14,15 @@ if [ "$1" = "--fix" ]; then
 fi
 
 echo "======================================"
-echo "Running all checks for UESynth client"
+echo "Running all checks for UESynth"
 echo "======================================"
 
 echo
-echo "1. Checking code formatting..."
+echo "1. Validating C++ build..."
+./check/cpp-build
+
+echo
+echo "2. Checking Python code formatting..."
 if [ -n "$FIX_FLAG" ]; then
     ./check/format
 else
@@ -26,7 +30,15 @@ else
 fi
 
 echo
-echo "2. Running linter..."
+echo "3. Checking C++ code formatting..."
+if [ -n "$FIX_FLAG" ]; then
+    ./check/cpp-format -Fix
+else
+    ./check/cpp-format -Check
+fi
+
+echo
+echo "4. Running linter..."
 if [ -n "$FIX_FLAG" ]; then
     ./check/lint --fix
 else
@@ -34,11 +46,11 @@ else
 fi
 
 echo
-echo "3. Running type checker..."
+echo "5. Running type checker..."
 ./check/typecheck
 
 echo
-echo "4. Running tests..."
+echo "6. Running tests..."
 ./check/test
 
 echo
